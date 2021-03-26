@@ -1,0 +1,249 @@
+---
+title: "NBA Raptor"
+author: "Bill Schmid"
+date: "3/23/2021"
+output: html_document
+---
+
+getting 31 warnings due opts_chunk settings
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(include = FALSE, echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+```{r}
+library(nbastatR)
+library(tidyverse)
+library(readr)
+library(htmltools)
+library(reactable)
+library(janitor)
+library(teamcolors)
+library(reactablefmtr)
+```
+
+```{r}
+df_raptor <- read_csv("https://raw.githubusercontent.com/fivethirtyeight/data/master/nba-raptor/modern_RAPTOR_by_team.csv")
+
+bref_players_stats(seasons = 2015:2019)
+
+df_headshots <- dataBREFPlayerAdvanced %>% 
+  clean_names() %>% 
+  select(name_player, url_player_headshot, slug_team_bref) 
+
+options(reactable.theme = reactableTheme(
+    backgroundColor = "#ece5d5"
+))
+  
+```
+
+
+```{r}
+vec_unique_teams <- df_headshots %>% 
+  distinct(slug_team_bref) %>% 
+  filter(slug_team_bref != "TOT") %>% 
+  arrange(slug_team_bref) %>% 
+  pull()
+
+df_team_logos <- teamcolors %>% 
+  filter(league == "nba") %>% 
+  add_column(vec_unique_teams) %>% 
+  mutate(vec_unique_teams = recode(vec_unique_teams, 
+                           CHI = "CHO",
+                           CHO = "CHI")) %>% 
+  mutate(
+    img_name = str_replace(logo, ".*[/]([^.]+)[.].*", "\\1"),
+    img_name = glue::glue("https://raw.githubusercontent.com/schmid07/R-Reactable-NBA-Raptor/main/logos/{img_name}.png")
+    )
+
+df_raptor_join <- df_raptor %>% 
+  left_join(df_team_logos, by = c("team" = "vec_unique_teams")) %>% 
+  left_join(df_headshots, by = c("player_name" = "name_player"))
+
+```
+
+```{r}
+df_raptor_join_1 <- df_raptor_join %>%
+  select(player_name, season, url_player_headshot, team, img_name, raptor_box_offense, raptor_box_defense, raptor_box_total, raptor_onoff_offense, raptor_onoff_defense, raptor_onoff_total, raptor_offense, raptor_defense, raptor_total, war_total) 
+
+```
+
+
+```{r}
+theme_538 <- function() {
+  reactable::reactableTheme(
+    searchInputStyle = list(width = "31%", backgroundColor = "#F9F9F9"),
+    style = list(
+      fontFamily = "Fira Mono"
+    ),
+    backgroundColor = "#ece5d5",
+    headerStyle = list(
+      "&:hover[aria-sort]" = list(
+        background = "hsl(0, 0%, 80%)"),
+      "&[aria-sort='ascending'], &[aria-sort='descending']" = list(
+        background = "#555",
+        color = "#FFF"
+      ),
+      borderColor = "#333"
+    ),
+    borderColor = "#CDCDCD"
+  )
+}
+```
+
+```{r}
+
+tbl <- reactable(df_raptor_join_1,
+                 theme = theme_538,
+                 columnGroups = list(
+                   colGroup(
+                     name = "BOX SCORE RAPTOR", columns = c("raptor_box_offense", 
+                                                            "raptor_box_defense",
+                                                            "raptor_box_total")
+                            ),
+                   colGroup(
+                     name = "ON/OFF RAPTOR", columns = c("raptor_onoff_offense",
+                                                         "raptor_onoff_defense",
+                                                         "raptor_onoff_total")
+                     ),
+                   colGroup(
+                     name = "OVERALL RAPTOR", columns = c("raptor_offense",
+                                                          "raptor_defense")
+                     )
+                   ),
+          columns = list(
+            url_player_headshot = colDef(
+              cell = embed_img(df_raptor_join_1, 
+                               label = "player_name", 
+                               height = "40", 
+                               width = "50"
+                               ),
+              name = "Player"
+              ),
+            team = colDef(show = FALSE),            
+            img_name = colDef(
+              cell = embed_img(df_raptor_join_1,
+                               label = "team",
+                               height = "40",
+                               width = "60"
+              ),
+              name = "Team"
+            ),
+            player_name = colDef(show = FALSE),
+            raptor_box_offense = colDef(
+              name = "OFF."
+            ),
+            raptor_box_defense = colDef(
+              name = "DEF."
+            ),
+            raptor_box_total = colDef(
+              name = "TOT."
+            ),
+            raptor_onoff_offense = colDef(
+              name = "OFF."
+            ),
+            raptor_onoff_defense = colDef(
+              name = "DEF."
+            ),
+            raptor_onoff_total = colDef(
+              name = "TOT."
+            ),
+            raptor_offense = colDef(
+              name = "OFF."
+            ),
+            raptor_defense = colDef(
+              name = "DEF."
+            ),
+            raptor_total = colDef(
+              name = "TOT."
+            ),
+            war_total = colDef(
+              name = "WAR"
+            )
+          )
+)
+```
+
+```{css, include = TRUE}
+
+.table-wrap {
+  box-shadow: 2px 3px 20px black;
+  background-color: #ece5d5;
+  font-family: "Fira Mono", Consolas, Monaco, monospace;
+}
+
+.table-subtitle {
+  font-size: 13px;
+  font-weight: 200;
+  font-family: "Fira Mono", Consolas, Monaco, monospace;
+  padding: 10px 10px 10px 10px;
+}
+  
+.table-title {
+  font-size: 30px;
+  font-weight: 600;
+  font-family: "Fira Mono", Consolas, Monaco, monospace;
+  padding: 10px 10px 10px 3px;
+}
+
+.drop-cap::first-letter {
+  color: #B22222;
+  float: left;
+  font-size: 70px;
+  line-height: 60px;
+  padding-top: 4px;
+  padding-right: 8px;
+  padding-left: 3px;
+}
+
+```
+
+
+```{r, include = TRUE}
+div(class = "table-wrap",
+    div(class = "table-title", "The Best NBA Players According to Raptor"),
+    div(class = "table-subtitle drop-cap", "This table highlights 538's new NBA statistic, RAPTOR, in addition to the more established Wins Above Replacement (WAR). An extra column, Playoff (P/O) War, is provided to highlight stars performers in the post-season, when the stakes are higher. The table is limited to the top-100 players who have played at least 1,000 minutes."),
+    br(),
+    br(),
+    tbl
+)
+
+```
+
+
+```{r}
+knitr::knit_exit()
+```
+
+https://themockup.blog/posts/2021-01-28-removing-image-backgrounds-with-magick/
+Below removes white space around logos
+```{r}
+clean_logo_transparent <- function(img_url) {
+  
+  # find the name of the img and extract it
+  img_name <- str_replace(img_url, ".*[/]([^.]+)[.].*", "\\1")
+
+  raw_img <- img_url %>%
+    image_read() %>% 
+    image_convert("PNG")
+  
+  img_mask <- raw_img  %>% 
+    image_fill("transparent", "+1+1", fuzz = 2, refcolor = "white") %>% 
+    image_fill("transparent", "+1+99", fuzz = 2, refcolor = "white") %>% 
+    image_fill("transparent", "+140+1", fuzz = 2, refcolor = "white") %>% 
+    image_fill("transparent", "+140+99", fuzz = 2, refcolor = "white") %>% 
+    image_channel("Opacity") %>%
+    image_convert(matte=FALSE) %>%
+    image_negate() %>%
+    image_blur()
+  
+  
+  image_composite(raw_img, img_mask, operator = "CopyOpacity") %>%
+    image_write(paste0(img_name, ".png"))
+}
+
+df_teamcolors %>% 
+  select(img_url = logo) %>% 
+  filter(str_detect(img_url, pattern = "NA.jpg", negate = TRUE)) %>% 
+  pwalk(clean_logo_transparent)
+```
+
